@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
+from sqlalchemy import text
 
 from backend.config import settings
 from backend.models.database import init_db
@@ -44,10 +45,9 @@ async def startup_event():
         logger.info("✅ Application started successfully!")
     except Exception as e:
         logger.error(f"❌ Startup failed: {e}", exc_info=True)
-        # Continue anyway so we can check logs in Render
 
 # =====================================================
-# GLOBAL EXCEPTION HANDLER
+# GLOBAL EXCEPTION HANDLER (SHOWS FULL ERROR)
 # =====================================================
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -56,7 +56,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={
             "detail": "Internal server error",
-            "error": str(exc) if settings.DEBUG else "An error occurred",
+            "error": str(exc),  # ⭐ Shows full error for debugging
+            "error_type": type(exc).__name__,
             "path": request.url.path
         }
     )
@@ -66,7 +67,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # =====================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # OK for now, configure properly in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,7 +81,6 @@ static_dir = os.path.join(BASE_DIR, "static")
 
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logger.info(f"✅ Static files mounted")
 
 # =====================================================
 # ROUTERS
@@ -107,7 +107,7 @@ def root():
     """
 
 # =====================================================
-# HEALTH CHECK (RENDER USES THIS)
+# HEALTH CHECK (FIXED SQL QUERY)
 # =====================================================
 @app.get("/health")
 def health_check():
@@ -117,13 +117,14 @@ def health_check():
     try:
         from backend.models.database import SessionLocal
         db = SessionLocal()
-        db.execute("SELECT 1")
+        # ⭐ FIX: Use text() for raw SQL in SQLAlchemy 2.0
+        db.execute(text("SELECT 1"))
         db.close()
         db_status = "connected"
         logger.info("✅ Health check passed")
     except Exception as e:
         logger.error(f"❌ Health check failed: {e}")
-        db_status = f"error: {str(e)[:50]}"
+        db_status = f"error: {str(e)}"
     
     return {
         "status": "healthy",
