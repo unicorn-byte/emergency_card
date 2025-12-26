@@ -15,9 +15,10 @@ import json
 # =====================
 
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt_sha256"],
     deprecated="auto"
 )
+
 
 
 def get_password_hash(password: str) -> str:
