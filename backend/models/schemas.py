@@ -15,7 +15,16 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
+    # ⭐ FIX: Added max_length=72
+    password: str = Field(..., min_length=8, max_length=72)
+    
+    # ⭐ FIX: Added validator to check byte length
+    @field_validator('password')
+    @classmethod
+    def validate_password_length(cls, v):
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password is too long (max 72 bytes)')
+        return v
 
 
 class UserLogin(BaseModel):
