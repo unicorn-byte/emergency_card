@@ -29,7 +29,6 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
-
 # =======================
 # UTILS
 # =======================
@@ -38,9 +37,10 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
-def create_tables():
+# ✅ THIS IS THE IMPORTANT FIX
+# main.py expects init_db()
+def init_db():
     Base.metadata.create_all(bind=engine)
-
 
 # =======================
 # MODELS
@@ -60,13 +60,20 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     emergency_profile = relationship(
-        "EmergencyProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "EmergencyProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
     )
     emergency_contacts = relationship(
-        "EmergencyContact", back_populates="user", cascade="all, delete-orphan"
+        "EmergencyContact",
+        back_populates="user",
+        cascade="all, delete-orphan"
     )
     access_logs = relationship(
-        "AccessLog", back_populates="user", cascade="all, delete-orphan"
+        "AccessLog",
+        back_populates="user",
+        cascade="all, delete-orphan"
     )
 
 
