@@ -2,6 +2,7 @@
 Pydantic schemas for request/response validation
 """
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from fastapi import HTTPException, status
 from typing import Optional, List
 from datetime import datetime
 
@@ -18,14 +19,17 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    # bcrypt supports max 72 bytes
+    # bcrypt supports max 72 BYTES
     password: str = Field(..., min_length=8, max_length=72)
 
     @field_validator("password")
     @classmethod
     def validate_password_length(cls, v: str):
         if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password is too long (max 72 bytes)")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password must be at most 72 bytes (bcrypt limitation)"
+            )
         return v
 
 
