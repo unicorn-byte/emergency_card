@@ -15,6 +15,8 @@ from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 # =======================
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 
 engine = create_engine(
     DATABASE_URL,
@@ -30,17 +32,29 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 # =======================
+# DB DEPENDENCY (FIX)
+# =======================
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# =======================
+# INIT DB (USED IN main.py)
+# =======================
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
+# =======================
 # UTILS
 # =======================
 
 def generate_uuid():
     return str(uuid.uuid4())
-
-
-# ✅ THIS IS THE IMPORTANT FIX
-# main.py expects init_db()
-def init_db():
-    Base.metadata.create_all(bind=engine)
 
 # =======================
 # MODELS
@@ -60,19 +74,15 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     emergency_profile = relationship(
-        "EmergencyProfile",
-        back_populates="user",
-        uselist=False,
-        cascade="all, delete-orphan"
+        "EmergencyProfile", back_populates="user",
+        uselist=False, cascade="all, delete-orphan"
     )
     emergency_contacts = relationship(
-        "EmergencyContact",
-        back_populates="user",
+        "EmergencyContact", back_populates="user",
         cascade="all, delete-orphan"
     )
     access_logs = relationship(
-        "AccessLog",
-        back_populates="user",
+        "AccessLog", back_populates="user",
         cascade="all, delete-orphan"
     )
 
