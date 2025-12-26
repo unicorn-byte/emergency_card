@@ -91,7 +91,10 @@ def get_my_profile(
     ).first()
 
     if not profile:
-        raise HTTPException(404, "Profile not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency profile not found"
+        )
 
     return profile
 
@@ -109,27 +112,30 @@ def update_profile(
     ).first()
 
     if not profile:
-        raise HTTPException(404, "Profile not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency profile not found"
+        )
 
     updates = data.model_dump(exclude_unset=True)
 
-    if "allergies" in updates:
+    if "allergies" in updates and updates["allergies"] is not None:
         updates["allergies"] = encryptor.encrypt_json(
             updates["allergies"].split(",")
         )
 
-    if "medical_conditions" in updates:
+    if "medical_conditions" in updates and updates["medical_conditions"] is not None:
         updates["medical_conditions"] = encryptor.encrypt_json(
             updates["medical_conditions"].split(",")
         )
 
-    if "medications" in updates:
+    if "medications" in updates and updates["medications"] is not None:
         updates["medications"] = encryptor.encrypt_json(
             updates["medications"].split(",")
         )
 
-    for k, v in updates.items():
-        setattr(profile, k, v)
+    for key, value in updates.items():
+        setattr(profile, key, value)
 
     db.commit()
     db.refresh(profile)
@@ -148,14 +154,17 @@ def delete_profile(
     ).first()
 
     if not profile:
-        raise HTTPException(404, "Profile not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency profile not found"
+        )
 
     db.delete(profile)
     db.commit()
     return None
 
 # =====================================================
-# QR CODE GENERATION
+# QR CODE GENERATION (🔥 PROD FIXED)
 # =====================================================
 @router.get("/qr-code", response_model=QRCodeResponse)
 def generate_qr(
@@ -167,9 +176,14 @@ def generate_qr(
     ).first()
 
     if not profile:
-        raise HTTPException(404, "Profile not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency profile not found"
+        )
 
+    # ✅ IMPORTANT: Use Render URL (NOT localhost)
     public_url = f"{settings.FRONTEND_URL}/emergency/{profile.public_id}"
+
     qr_base64, _ = generate_qr_code(public_url)
 
     return {
@@ -197,7 +211,10 @@ def add_contact(
     ).first()
 
     if exists:
-        raise HTTPException(400, "Contact already exists")
+        raise HTTPException(
+            status_code=400,
+            detail="Emergency contact already exists"
+        )
 
     new_contact = EmergencyContact(
         user_id=current_user.id,
@@ -210,7 +227,7 @@ def add_contact(
     return new_contact
 
 # =====================================================
-# GET CONTACTS
+# GET EMERGENCY CONTACTS
 # =====================================================
 @router.get(
     "/contacts",
@@ -220,12 +237,15 @@ def get_contacts(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return db.query(EmergencyContact).filter(
-        EmergencyContact.user_id == current_user.id
-    ).order_by(EmergencyContact.priority).all()
+    return (
+        db.query(EmergencyContact)
+        .filter(EmergencyContact.user_id == current_user.id)
+        .order_by(EmergencyContact.priority)
+        .all()
+    )
 
 # =====================================================
-# DELETE CONTACT
+# DELETE EMERGENCY CONTACT
 # =====================================================
 @router.delete(
     "/contacts/{contact_id}",
@@ -242,7 +262,10 @@ def delete_contact(
     ).first()
 
     if not contact:
-        raise HTTPException(404, "Contact not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency contact not found"
+        )
 
     db.delete(contact)
     db.commit()
