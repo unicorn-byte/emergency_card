@@ -20,7 +20,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-) -> User:
+):
     email = verify_token(token)
     if not email:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -57,9 +57,11 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    form: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     user = db.query(User).filter(User.email == form.username).first()
-
     if not user or not verify_password(form.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
 
@@ -67,5 +69,4 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
         data={"sub": user.email},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-
     return {"access_token": token, "token_type": "bearer"}
