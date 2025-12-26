@@ -6,14 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from backend.models import get_db
-from backend.models.database import EmergencyProfile, EmergencyContact, AccessLog
+from backend.models.database import (
+    get_db,
+    EmergencyProfile,
+    EmergencyContact,
+    AccessLog
+)
 from backend.models.schemas import PublicEmergencyCard
 from backend.utils.security import encryptor
 from backend.utils.pdf_generator import generate_full_page_card
+from backend.config import settings
 
 router = APIRouter(tags=["Public Emergency Access"])
-
 
 # -----------------------------------------------------
 # Helper: Log access
@@ -35,7 +39,6 @@ def log_access(public_id: str, request: Request, db: Session):
     except Exception as e:
         print(f"Access log error: {e}")
 
-
 # =====================================================
 # 🔁 PUBLIC ENTRY (QR ALWAYS HITS THIS)
 # =====================================================
@@ -46,9 +49,8 @@ def redirect_to_emergency_view(public_id: str):
         status_code=302
     )
 
-
 # =====================================================
-# 🧠 JSON API (PROGRAMMATIC USE ONLY)
+# 🧠 JSON API (PROGRAMMATIC USE)
 # =====================================================
 @router.get("/api/emergency/{public_id}", response_model=PublicEmergencyCard)
 def get_public_emergency_card_json(
@@ -61,7 +63,10 @@ def get_public_emergency_card_json(
     ).first()
 
     if not profile:
-        raise HTTPException(status_code=404, detail="Emergency card not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency card not found"
+        )
 
     log_access(public_id, request, db)
 
@@ -73,9 +78,12 @@ def get_public_emergency_card_json(
         "full_name": profile.full_name if profile.show_name else None,
         "age": profile.age if profile.show_age else None,
         "blood_group": profile.blood_group if profile.show_blood_group else None,
-        "allergies": encryptor.decrypt_json(profile.allergies) if profile.show_allergies else None,
-        "medical_conditions": encryptor.decrypt_json(profile.medical_conditions) if profile.show_conditions else None,
-        "medications": encryptor.decrypt_json(profile.medications) if profile.show_medications else None,
+        "allergies": encryptor.decrypt_json(profile.allergies)
+        if profile.show_allergies else None,
+        "medical_conditions": encryptor.decrypt_json(profile.medical_conditions)
+        if profile.show_conditions else None,
+        "medications": encryptor.decrypt_json(profile.medications)
+        if profile.show_medications else None,
         "organ_donor": profile.organ_donor,
         "emergency_contacts": [
             {
@@ -87,9 +95,8 @@ def get_public_emergency_card_json(
         ]
     }
 
-
 # =====================================================
-# 🖥️ UI VIEW (LIVELY + MOBILE FRIENDLY)
+# 🖥️ UI VIEW (MOBILE + FIRST RESPONDER FRIENDLY)
 # =====================================================
 @router.get("/emergency/{public_id}/view", response_class=HTMLResponse)
 def view_emergency_card_html(
@@ -102,7 +109,10 @@ def view_emergency_card_html(
     ).first()
 
     if not profile:
-        return HTMLResponse("<h1>Emergency Card Not Found</h1>", status_code=404)
+        return HTMLResponse(
+            "<h1>Emergency Card Not Found</h1>",
+            status_code=404
+        )
 
     log_access(public_id, request, db)
 
@@ -258,18 +268,16 @@ body {{
     </div>
 
     <div class="footer">
-        Emergency Info Card • Scan QR for instant access
+        Emergency Info Card • Powered by QR Access
     </div>
 </div>
 </body>
 </html>
 """
-
     return HTMLResponse(content=html_content)
 
-
 # =====================================================
-# 📄 PDF DOWNLOAD
+# 📄 PDF DOWNLOAD (PROD URL FIX)
 # =====================================================
 @router.get("/emergency/{public_id}/pdf")
 def download_emergency_card_pdf(
@@ -281,7 +289,10 @@ def download_emergency_card_pdf(
     ).first()
 
     if not profile:
-        raise HTTPException(status_code=404, detail="Emergency card not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency card not found"
+        )
 
     primary_contact = db.query(EmergencyContact).filter(
         EmergencyContact.user_id == profile.user_id,
@@ -298,7 +309,9 @@ def download_emergency_card_pdf(
         }
     }
 
-    qr_url = f"http://localhost:8000/emergency/{public_id}"
+    # ✅ IMPORTANT: Render URL (NOT localhost)
+    qr_url = f"{settings.FRONTEND_URL}/emergency/{public_id}"
+
     pdf_bytes = generate_full_page_card(user_data, qr_url)
 
     import tempfile
@@ -306,4 +319,8 @@ def download_emergency_card_pdf(
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
 
-    return FileResponse(tmp_path, filename=f"emergency_card_{public_id}.pdf")
+    return FileResponse(
+        tmp_path,
+        filename=f"emergency_card_{public_id}.pdf",
+        media_type="application/pdf"
+    )
