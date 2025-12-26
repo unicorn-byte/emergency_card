@@ -13,6 +13,7 @@ import json
 # =====================
 # Password hashing
 # =====================
+# Using bcrypt_sha256 to avoid 72-byte bcrypt limitation issues on Render
 
 pwd_context = CryptContext(
     schemes=["bcrypt_sha256"],
@@ -20,21 +21,14 @@ pwd_context = CryptContext(
 )
 
 
-
 def get_password_hash(password: str) -> str:
-    """
-    Hash a password (bcrypt supports max 72 BYTES)
-    """
-    password_bytes = password.encode("utf-8")[:72]
-    return pwd_context.hash(password_bytes)
+    """Hash a password"""
+    return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a password against its hash
-    """
-    password_bytes = plain_password.encode("utf-8")[:72]
-    return pwd_context.verify(password_bytes, hashed_password)
+    """Verify a password against its hash"""
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 # =====================
@@ -53,6 +47,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         )
 
     to_encode.update({"exp": expire})
+
     encoded_jwt = jwt.encode(
         to_encode,
         settings.SECRET_KEY,
