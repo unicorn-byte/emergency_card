@@ -22,12 +22,27 @@ from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set")
+    raise RuntimeError("❌ DATABASE_URL environment variable is not set")
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True
-)
+# ⭐ FIX: Render provides postgres:// but SQLAlchemy 2.0+ needs postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    print(f"✅ Fixed DATABASE_URL format: postgres:// → postgresql://")
+
+print(f"🔗 Connecting to database: {DATABASE_URL[:30]}...")
+
+try:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        echo=False  # Set to True for SQL debugging
+    )
+    print("✅ Database engine created successfully")
+except Exception as e:
+    print(f"❌ Failed to create database engine: {e}")
+    raise
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -49,11 +64,18 @@ def get_db():
         db.close()
 
 # =====================================================
-# INIT DB (CALLED IN main.py)
+# INIT DB (CALLED IN main.py STARTUP EVENT)
 # =====================================================
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    """Create all database tables"""
+    try:
+        print("🔄 Creating database tables...")
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created successfully!")
+    except Exception as e:
+        print(f"❌ Failed to create database tables: {e}")
+        raise
 
 # =====================================================
 # UTILS
